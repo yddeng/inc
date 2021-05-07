@@ -1,0 +1,39 @@
+syntax = "proto3";
+option go_package = "net";
+
+// 内网服务器注册到中心服务器
+message register_req{
+    string name = 1;
+}
+
+message register_resp{
+    string msg = 1;
+    uint32 ID  = 2;
+}
+
+// 控制台连接内网服务器
+message connection_req{
+    string password = 1;
+}
+
+message connection_resp{
+    string msg = 1;
+    uint32 ID  = 2;
+}
+
+// 控制台命令到中心服务器
+message command_req{
+    string cmd = 1;
+}
+
+message command_resp{
+    string ret = 2;
+}
+
+// 心跳
+message heartbeat{}
+
+// 隧道消息
+message tun_msg{
+    bytes data   = 1;
+}
