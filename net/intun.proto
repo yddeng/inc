@@ -23,7 +23,7 @@ message connection_resp{
 
 // 控制台命令到中心服务器
 message command_req{
-    string cmd = 1;
+    string cmd = 1; // list, select,
 }
 
 message command_resp{
@@ -34,6 +34,10 @@ message command_resp{
 message heartbeat{}
 
 // 隧道消息
-message tun_msg{
+message tun_msg_req{
+    bytes data   = 1;
+}
+
+message tun_msg_resp{
     bytes data   = 1;
 }

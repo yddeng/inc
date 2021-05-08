@@ -7,6 +7,14 @@ import (
 
 var pb *protocol.Protocol
 
+const (
+	CmdRegister   = 1
+	CmdConnection = 2
+	CmdCommand    = 3
+	CmdTunMsg     = 4
+	CmdHeart
+)
+
 func init() {
 	pb = protocol.NewProtoc(&protobuf.Protobuf{})
 
