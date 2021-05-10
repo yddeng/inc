@@ -8,6 +8,19 @@ import (
 	"os"
 )
 
+func logo() string {
+	l := `
+___  ________   _________  ___  ___  ________      
+|\  \|\   ___  \|\___   ___\\  \|\  \|\   ___  \        Internal Network Tunnel  
+\ \  \ \  \\ \  \|___ \  \_\ \  \\\  \ \  \\ \  \       
+ \ \  \ \  \\ \  \   \ \  \ \ \  \\\  \ \  \\ \  \      Version: 1.0
+  \ \  \ \  \\ \  \   \ \  \ \ \  \\\  \ \  \\ \  \     
+   \ \__\ \__\\ \__\   \ \__\ \ \_______\ \__\\ \__\
+    \|__|\|__| \|__|    \|__|  \|_______|\|__| \|__|      `
+
+	return l
+}
+
 func main() {
 	commandLine := flag.NewFlagSet("intun", flag.ExitOnError)
 	i := commandLine.String("i", "", "--identity          identity of use (master, slave, client), required  ")
@@ -18,6 +31,8 @@ func main() {
 	if *i == "" || *h == "" || *p == 0 {
 		return
 	}
+
+	fmt.Println(logo())
 
 	switch *i {
 	case "master":
