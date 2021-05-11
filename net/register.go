@@ -11,6 +11,13 @@ var (
 )
 
 const (
+	CmdProxyRegister   = 101
+	CmdProxyUnregister = 102
+	CmdProxyList       = 103
+	CmdProxyMessage    = 104
+)
+
+const (
 	CmdLeafRegister  = 1
 	CmdCliAuth       = 2
 	CmdCliCommand    = 3
@@ -24,6 +31,18 @@ func init() {
 	pbReq = protocol.NewProtoc(&protobuf.Protobuf{})
 	pbResp = protocol.NewProtoc(&protobuf.Protobuf{})
 
+	// proxy
+	pbReq.Register(CmdProxyRegister, &ProxyRegisterReq{})
+	pbReq.Register(CmdProxyUnregister, &ProxyUnregisterReq{})
+	pbReq.Register(CmdProxyList, &ProxyListReq{})
+	pbReq.Register(CmdProxyMessage, &ProxyMessageReq{})
+
+	pbResp.Register(CmdProxyRegister, &ProxyRegisterResp{})
+	pbResp.Register(CmdProxyUnregister, &ProxyUnregisterResp{})
+	pbResp.Register(CmdProxyList, &ProxyListResp{})
+	pbResp.Register(CmdProxyMessage, &ProxyMessageResp{})
+
+	//
 	pbReq.Register(CmdLeafRegister, &LeafRegisterReq{})
 	pbReq.Register(CmdCliAuth, &CliAuthReq{})
 	pbReq.Register(CmdCliCommand, &CliCommandReq{})

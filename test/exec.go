@@ -141,6 +141,7 @@ func forkExec(name string, argv []string) error {
 
 func cmdExec(name string, argv []string) *exec.Cmd {
 	cmd := exec.Command(name, argv[1:]...)
+
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
@@ -149,7 +150,7 @@ func cmdExec(name string, argv []string) *exec.Cmd {
 
 func startServer() {
 	laddr := "127.0.0.1:2345"
-	raddr := "127.0.0.1:5432"
+	raddr := "10.128.2.123:23455"
 	if err := listen(laddr, raddr); err != nil {
 		panic(err)
 	}
@@ -163,7 +164,7 @@ func main() {
 	go startServer()
 
 loop:
-
+	fmt.Printf("==>")
 	_, words, length := readWords()
 	switch length {
 	case 0:

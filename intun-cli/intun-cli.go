@@ -54,8 +54,7 @@ func main() {
 	}
 
 	fmt.Print("Password to connection root:")
-	var pw string
-	fmt.Scan(&pw)
+	pw := readLine()
 
 	address := fmt.Sprintf("%s:%d", *h, *p)
 	client := intun.LaunchClient(address, pw)

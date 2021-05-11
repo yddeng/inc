@@ -57,6 +57,7 @@ message close_tunnel_resp{
 // 隧道消息
 message tunnel_message_req{
     bool   close = 1;
+    uint32 connID = 2;
     string tunID = 3;
     bytes  data  = 4;
 }

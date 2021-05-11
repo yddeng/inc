@@ -20,9 +20,9 @@ type Client struct {
 	rpcServer *drpc.Server
 	rpcClient *drpc.Client
 
-	id     uint32
-	leaf   uint32
-	tunnel *clientTunnel
+	id       uint32
+	leaf     uint32
+	acceptor *acceptor
 }
 
 func (this *Client) SendRequest(req *drpc.Request) error {
@@ -110,66 +110,100 @@ func (this *Client) SelectLeaf(leaf uint32) {
 }
 
 func (this *Client) CreateTunnel(laddr, raddr string) error {
-	if this.leaf == 0 {
-		return fmt.Errorf("select leaf before")
+	errC := make(chan error, 1)
+
+	f := func() {
+		if this.leaf == 0 {
+			errC <- fmt.Errorf("select leaf before")
+			return
+		}
+
+		req := &net.CreateTunnelReq{
+			LeafID:  this.leaf,
+			Address: raddr,
+		}
+
+		if err := this.rpcClient.Go(this, proto.MessageName(req), req, drpc.DefaultRPCTimeout, func(i interface{}, e error) {
+			resp := i.(*net.CreateTunnelResp)
+			if resp.GetMsg() != "" {
+				errC <- fmt.Errorf(resp.GetMsg())
+				return
+			}
+
+			acceptor := &acceptor{
+				client: this,
+				tunID:  resp.GetTunnelID(),
+				conns:  map[uint32]net2.Conn{},
+			}
+
+			if err := acceptor.listen(laddr); err != nil {
+				errC <- err
+				return
+			}
+
+			fmt.Println("create tunnel ok", resp.GetTunnelID())
+			this.acceptor = acceptor
+			errC <- nil
+		}); err != nil {
+			errC <- err
+		}
 	}
 
-	req := &net.CreateTunnelReq{
-		LeafID:  this.leaf,
-		Address: raddr,
-	}
-
-	ret, err := this.rpcClient.Call(this, proto.MessageName(req), req, drpc.DefaultRPCTimeout)
-	if err != nil {
-		return err
-	}
-
-	resp := ret.(*net.CreateTunnelResp)
-	if resp.GetMsg() != "" {
-		return fmt.Errorf(resp.GetMsg())
-	}
-
-	this.tunnel = &clientTunnel{
-		tunID:    resp.GetTunnelID(),
-		listener: this.listen(laddr),
-	}
-	fmt.Println("create tunnel ok", resp.GetTunnelID())
-	return nil
+	this.taskQueue.Push(f)
+	return <-errC
 }
 
 func (this *Client) onTunnelMessage(replier *drpc.Replier, req interface{}) {
 	msg := req.(*net.TunnelMessageReq)
-	if this.tunnel == nil {
+	if this.acceptor == nil {
 		replier.Reply(&net.TunnelMessageResp{Msg: "tunnel is not exist"}, nil)
 		return
 	}
 
-	fmt.Println("--", msg.GetData())
-	_, err := this.tunnel.conn.Write(msg.GetData())
-	if err != nil {
-		replier.Reply(&net.TunnelMessageResp{Msg: "conn.Write " + err.Error()}, nil)
+	conn, ok := this.acceptor.conns[msg.GetConnID()]
+	if !ok {
+		replier.Reply(&net.TunnelMessageResp{Msg: "tunnel is not exist"}, nil)
 		return
+	}
+
+	if msg.GetClose() {
+		fmt.Println("ontunnel close")
+		this.acceptor.close(msg.GetConnID())
+	} else {
+		fmt.Println("--", msg.GetData())
+		_, err := conn.Write(msg.GetData())
+		if err != nil {
+			replier.Reply(&net.TunnelMessageResp{Msg: "conn.Write " + err.Error()}, nil)
+			return
+		}
 	}
 	replier.Reply(&net.TunnelMessageResp{}, nil)
 }
 
-type clientTunnel struct {
+type acceptor struct {
+	client   *Client
 	tunID    string
 	listener net2.Listener
-	conn     net2.Conn
+	counter  uint32
+	conns    map[uint32]net2.Conn
 }
 
-func (this *Client) listen(laddr string) net2.Listener {
-	l, err := net2.Listen("tcp", laddr)
-	if err != nil {
-		panic(err)
+func (this *acceptor) close(id uint32) {
+	c, ok := this.conns[id]
+	if ok {
+		c.Close()
+		delete(this.conns, id)
 	}
+}
 
-	fmt.Println("listen ok", laddr)
+func (this *acceptor) listen(addr string) (err error) {
+	if this.listener, err = net2.Listen("tcp", addr); err != nil {
+		return
+	}
 
 	go func() {
 		for {
-			conn, err := l.Accept()
+			conn, err := this.listener.Accept()
 			if err != nil {
 				if ne, ok := err.(net2.Error); ok && ne.Temporary() {
 					continue
@@ -177,41 +211,42 @@ func (this *Client) listen(laddr string) net2.Listener {
 					panic(err)
 				}
 			}
-
-			if this.tunnel.conn == nil {
-				this.tunnel.conn = conn
-				go func() {
-					buf := make([]byte, 1024)
-					for {
-						n, err := conn.Read(buf)
-						if err != nil {
-							conn.Close()
-							this.tunnel.conn = nil
-							fmt.Println("client.Read", err)
-							break
-						}
-
-						msg := &net.TunnelMessageReq{
-							TunID: this.tunnel.tunID,
-							Data:  buf[:n],
-						}
-						fmt.Println("client.Read", buf[:n])
-						if _, err := this.rpcClient.Call(this, proto.MessageName(&net.TunnelMessageReq{}), msg, drpc.DefaultRPCTimeout); err != nil {
-							break
-						}
-
-					}
-				}()
-			} else {
-				conn.Close()
-				fmt.Println("already conn")
-				continue
-			}
+			this.handleConn(conn)
 		}
 	}()
-	return nil
+	return
 }
 
-func forwardData() {
+func (this *acceptor) handleConn(conn net2.Conn) {
+	this.client.taskQueue.Push(func() {
+		id := this.counter
+		this.counter++
+		this.conns[id] = conn
 
+		go func() {
+			buf := make([]byte, 1024)
+			for {
+				msg := &net.TunnelMessageReq{TunID: this.tunID, ConnID: id}
+
+				n, err := conn.Read(buf)
+				if err != nil {
+					fmt.Println("client.Read", err)
+					msg.Close = true
+					_, _ = this.client.rpcClient.Call(this.client, proto.MessageName(msg), msg, drpc.DefaultRPCTimeout)
+					break
+				}
+
+				fmt.Println("client.Read", buf[:n])
+				msg.Data = buf[:n]
+				if _, err := this.client.rpcClient.Call(this.client, proto.MessageName(msg), msg, drpc.DefaultRPCTimeout); err != nil {
+					break
+				}
+
+			}
+
+			this.client.taskQueue.Push(func() {
+				this.close(id)
+			})
+		}()
+	})
 }

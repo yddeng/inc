@@ -20,7 +20,7 @@ type Leaf struct {
 	taskQueue *task.TaskQueue
 
 	counter uint32
-	tunnel  map[string]*leafTunnel
+	dialers map[string]*dialer
 
 	dialing bool
 	session dnet.Session
@@ -124,7 +124,7 @@ func LaunchLeaf(name, rootAddr string) *Leaf {
 		rAddr:     rootAddr,
 		taskQueue: taskQueue,
 		counter:   1,
-		tunnel:    map[string]*leafTunnel{},
+		dialers:   map[string]*dialer{},
 		rpcServer: drpc.NewServer(),
 		rpcClient: drpc.NewClient(),
 	}
@@ -142,77 +142,90 @@ func (this *Leaf) onCreateTunnel(replier *drpc.Replier, req interface{}) {
 	fmt.Println("onCreateTunnel", msg)
 	id := fmt.Sprintf("%d:%d", this.id, this.counter)
 
-	leaf := &leafTunnel{tunID: id, address: msg.GetAddress(), leaf: this,
-		buf: make([]byte, 1024)}
+	dialer := &dialer{tunID: id, address: msg.GetAddress(), leaf: this}
 	//if err := leaf.dial(); err != nil {
 	//	replier.Reply(&net2.CreateTunnelResp{Msg: err.Error()}, nil)
 	//	return
 	//}
 
 	this.counter++
-	this.tunnel[id] = leaf
+	this.dialers[id] = dialer
 	replier.Reply(&net2.CreateTunnelResp{TunnelID: id}, nil)
 }
 
 func (this *Leaf) onTunnelMessage(replier *drpc.Replier, req interface{}) {
 	msg := req.(*net2.TunnelMessageReq)
 	fmt.Println("onTunnelMessage", msg)
-	tun, ok := this.tunnel[msg.GetTunID()]
+	dialer, ok := this.dialers[msg.GetTunID()]
 	if !ok {
 		replier.Reply(&net2.TunnelMessageResp{Msg: "tunnel is not exist"}, nil)
 		return
 	}
 
-	if tun.conn == nil {
-		tun.dial()
-	}
-
-	_, err := tun.conn.Write(msg.GetData())
-	if err != nil {
-		replier.Reply(&net2.TunnelMessageResp{Msg: "conn.Write " + err.Error()}, nil)
-		return
+	if msg.GetClose() {
+		dialer.close()
+	} else {
+		dialer.connID = msg.GetConnID()
+		if err := dialer.write(msg.GetData()); err != nil {
+			replier.Reply(&net2.TunnelMessageResp{Msg: "conn.Write " + err.Error()}, nil)
+			return
+		}
 	}
 	replier.Reply(&net2.TunnelMessageResp{}, nil)
 }
 
-type leafTunnel struct {
+type dialer struct {
 	leaf    *Leaf
 	tunID   string
 	address string
+	connID  uint32
 	conn    net.Conn
-	buf     []byte
 }
 
-func (this *leafTunnel) dial() error {
-	conn, err := net.Dial("tcp", this.address)
-	if err != nil {
-		return err
+func (this *dialer) close() {
+	if this.conn != nil {
+		this.conn.Close()
+		this.conn = nil
 	}
-	this.conn = conn
-	// read from conn
+}
+
+func (this *dialer) write(b []byte) (err error) {
+	if this.conn == nil {
+		if this.conn, err = net.Dial("tcp", this.address); err != nil {
+			return
+		}
+		go this.handleConn()
+	}
+	if _, err = this.conn.Write(b); err != nil {
+		return
+	}
+	return
+}
+
+func (this *dialer) handleConn() {
 	go func() {
+		buf := make([]byte, 1024)
 		for {
-			n, err := conn.Read(this.buf)
+			msg := &net2.TunnelMessageReq{TunID: this.tunID, ConnID: this.connID}
+
+			n, err := this.conn.Read(buf)
 			if err != nil {
 				fmt.Println("conn.Read", err)
+				msg.Close = true
+				_, _ = this.leaf.rpcClient.Call(this.leaf, proto.MessageName(msg), msg, drpc.DefaultRPCTimeout)
 				break
 			}
 
-			msg := &net2.TunnelMessageReq{
-				TunID: this.tunID,
-				Data:  this.buf[:n],
-			}
-			fmt.Println("conn.Read", this.buf[:n])
-			if _, err := this.leaf.rpcClient.Call(this.leaf, proto.MessageName(&net2.TunnelMessageReq{}), msg, drpc.DefaultRPCTimeout); err != nil {
+			fmt.Println("conn.Read", buf[:n])
+			msg.Data = buf[:n]
+			if _, err := this.leaf.rpcClient.Call(this.leaf, proto.MessageName(msg), msg, drpc.DefaultRPCTimeout); err != nil {
 				break
 			}
 		}
 
-		conn.Close()
 		this.leaf.taskQueue.Push(func() {
-			this.conn = nil
+			this.close()
 		})
 
 	}()
-	return nil
 }
