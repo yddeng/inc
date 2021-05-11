@@ -69,7 +69,7 @@ func forwardData(raddr *net.TCPAddr) {
 				fmt.Println("1rconn", conn.LocalAddr().String(), err)
 				break
 			}
-			//fmt.Println("rconn read", n, string(buf[:n]))
+			fmt.Println("rconn read", n, buf[:n])
 			if _, err := forwardConn.Write(buf[:n]); err != nil {
 				panic(err)
 			}
@@ -83,7 +83,7 @@ func forwardData(raddr *net.TCPAddr) {
 			fmt.Println("1forwardConn", err)
 			break
 		}
-		//fmt.Println("forward conn read", n, string(buf[:n]))
+		fmt.Println("forward conn read", n, buf[:n])
 		_, err = conn.Write(buf[:n])
 		if err != nil {
 			fmt.Println("2forwardConn", err)

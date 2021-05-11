@@ -5,30 +5,39 @@ import (
 	"github.com/yddeng/dutil/protocol/protobuf"
 )
 
-var pb *protocol.Protocol
+var (
+	pbReq  *protocol.Protocol
+	pbResp *protocol.Protocol
+)
 
 const (
-	CmdRegister   = 1
-	CmdConnection = 2
-	CmdCommand    = 3
-	CmdTunMsg     = 4
-	CmdHeart
+	CmdLeafRegister  = 1
+	CmdCliAuth       = 2
+	CmdCliCommand    = 3
+	CmdCreateTunnel  = 4
+	CmdTunnelMessage = 5
+	CmdHeartbeat     = 6
+	CmdCloseTunnel   = 7
 )
 
 func init() {
-	pb = protocol.NewProtoc(&protobuf.Protobuf{})
+	pbReq = protocol.NewProtoc(&protobuf.Protobuf{})
+	pbResp = protocol.NewProtoc(&protobuf.Protobuf{})
 
-	pb.Register(11, &RegisterReq{})
-	pb.Register(12, &RegisterResp{})
+	pbReq.Register(CmdLeafRegister, &LeafRegisterReq{})
+	pbReq.Register(CmdCliAuth, &CliAuthReq{})
+	pbReq.Register(CmdCliCommand, &CliCommandReq{})
+	pbReq.Register(CmdCreateTunnel, &CreateTunnelReq{})
+	pbReq.Register(CmdTunnelMessage, &TunnelMessageReq{})
+	pbReq.Register(CmdHeartbeat, &Heartbeat{})
+	pbReq.Register(CmdCloseTunnel, &CloseTunnelReq{})
 
-	pb.Register(21, &ConnectionReq{})
-	pb.Register(22, &ConnectionResp{})
-
-	pb.Register(31, &CommandReq{})
-	pb.Register(32, &CommandResp{})
-
-	pb.Register(40, &TunMsg{})
-
-	pb.Register(50, &Heartbeat{})
+	pbResp.Register(CmdLeafRegister, &LeafRegisterResp{})
+	pbResp.Register(CmdCliAuth, &CliAuthResp{})
+	pbResp.Register(CmdCliCommand, &CliCommandResp{})
+	pbResp.Register(CmdCreateTunnel, &CreateTunnelResp{})
+	pbResp.Register(CmdTunnelMessage, &TunnelMessageResp{})
+	pbResp.Register(CmdHeartbeat, &Heartbeat{})
+	pbResp.Register(CmdCloseTunnel, &CloseTunnelResp{})
 
 }
