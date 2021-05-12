@@ -118,7 +118,7 @@ func (this *IncMaster) onLogin(replier *drpc.Replier, req interface{}) {
 	this.counter++
 
 	end.name = msg.GetName()
-	end.leaf = true
+	end.isSlave = true
 
 	this.ends[end.uId] = end
 	end.session.SetContext(end)
@@ -159,7 +159,7 @@ func (this *IncMaster) onRegister(replier *drpc.Replier, req interface{}) {
 
 	// listener
 	l := &listener{mapID: mapId}
-	address := fmt.Sprintf("%s:%d", this.ip, msg.GetMaps().GetRemotePort())
+	address := fmt.Sprintf("%s:%d", this.ip, msg.GetMaps().GetExternalPort())
 	if err := l.listen(address, func(conn net2.Conn) {
 		this.taskQueue.Push(func() {
 			open := &net.OpenChannelReq{MapId: mapId}
@@ -172,6 +172,8 @@ func (this *IncMaster) onRegister(replier *drpc.Replier, req interface{}) {
 				}
 				resp := i.(*net.OpenChannelResp)
 				if resp.GetMsg() != "" {
+					fmt.Println("openChannel error", resp.GetMsg())
+					_ = conn.Close()
 					return
 				}
 
@@ -200,7 +202,7 @@ func (this *IncMaster) onRegister(replier *drpc.Replier, req interface{}) {
 		return
 	}
 
-	dialerAddr := fmt.Sprintf("%s:%d", msg.GetMaps().GetLocalIp(), msg.GetMaps().GetLocalPort())
+	dialerAddr := fmt.Sprintf("%s:%d", msg.GetMaps().GetInternalIp(), msg.GetMaps().GetInternalPort())
 	create := &net.CreateDialerReq{
 		MapId:   mapId,
 		Address: dialerAddr,

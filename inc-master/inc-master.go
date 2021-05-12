@@ -7,22 +7,8 @@ import (
 	"os"
 )
 
-func logo() string {
-	l := `
-___  ________   _________  ___  ___  ________      
-|\  \|\   ___  \|\___   ___\\  \|\  \|\   ___  \        Internal Network Tunnel  
-\ \  \ \  \\ \  \|___ \  \_\ \  \\\  \ \  \\ \  \       
- \ \  \ \  \\ \  \   \ \  \ \ \  \\\  \ \  \\ \  \      ROOT
-  \ \  \ \  \\ \  \   \ \  \ \ \  \\\  \ \  \\ \  \     
-   \ \__\ \__\\ \__\   \ \__\ \ \_______\ \__\\ \__\
-    \|__|\|__| \|__|    \|__|  \|_______|\|__| \|__|      
-`
-
-	return l
-}
-
 func main() {
-	fmt.Println(logo())
+	fmt.Println(inc.Logo("inc-master"))
 
 	commandLine := flag.NewFlagSet("inc", flag.ExitOnError)
 	h := commandLine.String("h", "", "--host=HOSTNAME     start server host, required ")

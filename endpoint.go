@@ -6,9 +6,9 @@ import (
 )
 
 type endpoint struct {
-	leaf    bool
-	name    string
 	uId     uint32
+	name    string
+	isSlave bool
 	session dnet.Session
 }
 

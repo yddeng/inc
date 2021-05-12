@@ -24,10 +24,10 @@ message auth_resp{
 
 // 代理映射
 message mapping {
-    string local_ip    = 1;
-    int32  local_port  = 2;
-    int32  remote_port = 3;
-    string description = 4;
+    string internal_ip    = 1; // 内网ip
+    int32  internal_port  = 2; // 内网代理端口
+    int32  external_port  = 3; // 外网端口
+    string description    = 4;
 }
 
 // 注册代理映射

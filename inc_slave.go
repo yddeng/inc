@@ -142,10 +142,10 @@ func LaunchIncSlave(name, rootAddr string) *IncSlave {
 func (this *IncSlave) testInit() {
 	req := &net.RegisterReq{
 		Maps: &net.Mapping{
-			LocalIp:     "10.128.2.123",
-			LocalPort:   22,
-			RemotePort:  2346,
-			Description: "ssh",
+			InternalIp:   "10.128.2.123",
+			InternalPort: 22,
+			ExternalPort: 2346,
+			Description:  "ssh",
 		},
 		SlaveId: this.id,
 	}
@@ -170,10 +170,10 @@ func (this *IncSlave) testInit() {
 func (this *IncSlave) testInit2() {
 	req := &net.RegisterReq{
 		Maps: &net.Mapping{
-			LocalIp:     "127.0.0.1",
-			LocalPort:   5432,
-			RemotePort:  2345,
-			Description: "psql",
+			InternalIp:   "127.0.0.1",
+			InternalPort: 5432,
+			ExternalPort: 2345,
+			Description:  "psql",
 		},
 		SlaveId: this.id,
 	}
