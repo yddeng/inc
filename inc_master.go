@@ -182,7 +182,6 @@ func (this *IncMaster) onRegister(replier *drpc.Replier, req interface{}) {
 					mapID:     open.GetMapId(),
 					conn:      conn,
 					rpcClient: this.rpcClient,
-					taskQueue: this.taskQueue,
 					session:   end.session,
 				}
 

@@ -6,7 +6,6 @@ import (
 	"github.com/yddeng/dnet"
 	"github.com/yddeng/dnet/drpc"
 	net2 "github.com/yddeng/inc/net"
-	"github.com/yddeng/utils/task"
 	"net"
 )
 
@@ -15,7 +14,6 @@ type channel struct {
 	mapID     uint32
 	conn      net.Conn
 	rpcClient *drpc.Client
-	taskQueue *task.TaskQueue
 	session   dnet.Session
 }
 

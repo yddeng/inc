@@ -236,7 +236,6 @@ func (this *IncSlave) onOpenChannel(replier *drpc.Replier, req interface{}) {
 		channelID: msg.GetChannelId(),
 		mapID:     msg.GetMapId(),
 		session:   this.session,
-		taskQueue: this.taskQueue,
 		rpcClient: this.rpcClient,
 	}
 
