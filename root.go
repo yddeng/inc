@@ -1,12 +1,12 @@
-package intun
+package inc
 
 import (
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	"github.com/yddeng/dnet"
 	"github.com/yddeng/dnet/drpc"
-	"github.com/yddeng/dutil/task"
-	"github.com/yddeng/intun/net"
+	"github.com/yddeng/inc/net"
+	"github.com/yddeng/utils/task"
 	"reflect"
 )
 

@@ -3,8 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/yddeng/dutil/strutil"
-	"github.com/yddeng/intun"
+	"github.com/yddeng/inc"
+	"github.com/yddeng/utils/strutil"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -44,7 +44,7 @@ func main() {
 	signal.Ignore(syscall.SIGINT, syscall.SIGTERM)
 	fmt.Println(logo())
 
-	commandLine := flag.NewFlagSet("intun", flag.ExitOnError)
+	commandLine := flag.NewFlagSet("inc", flag.ExitOnError)
 	h := commandLine.String("h", "", "--host=HOSTNAME     start server host, required ")
 	p := commandLine.Int("p", 0, "--port=PORT         start server port, required ")
 	commandLine.Parse(os.Args[1:])
@@ -57,7 +57,7 @@ func main() {
 	pw := readLine()
 
 	address := fmt.Sprintf("%s:%d", *h, *p)
-	client := intun.LaunchClient(address, pw)
+	client := inc.LaunchClient(address, pw)
 
 loop:
 	fmt.Print("==>")

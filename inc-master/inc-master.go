@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/yddeng/intun"
+	"github.com/yddeng/inc"
 	"os"
 )
 
@@ -12,7 +12,7 @@ func logo() string {
 ___  ________   _________  ___  ___  ________      
 |\  \|\   ___  \|\___   ___\\  \|\  \|\   ___  \        Internal Network Tunnel  
 \ \  \ \  \\ \  \|___ \  \_\ \  \\\  \ \  \\ \  \       
- \ \  \ \  \\ \  \   \ \  \ \ \  \\\  \ \  \\ \  \      LEAF
+ \ \  \ \  \\ \  \   \ \  \ \ \  \\\  \ \  \\ \  \      ROOT
   \ \  \ \  \\ \  \   \ \  \ \ \  \\\  \ \  \\ \  \     
    \ \__\ \__\\ \__\   \ \__\ \ \_______\ \__\\ \__\
     \|__|\|__| \|__|    \|__|  \|_______|\|__| \|__|      
@@ -24,10 +24,10 @@ ___  ________   _________  ___  ___  ________
 func main() {
 	fmt.Println(logo())
 
-	commandLine := flag.NewFlagSet("intun", flag.ExitOnError)
+	commandLine := flag.NewFlagSet("inc", flag.ExitOnError)
 	h := commandLine.String("h", "", "--host=HOSTNAME     start server host, required ")
 	p := commandLine.Int("p", 0, "--port=PORT         start server port, required ")
-	n := commandLine.String("pw", "leaf", "--name=NAME     name for leaf, optional ")
+	pw := commandLine.String("pw", "", "--password     for client auth, optional ")
 	commandLine.Parse(os.Args[1:])
 
 	if *h == "" || *p == 0 {
@@ -35,8 +35,9 @@ func main() {
 	}
 
 	address := fmt.Sprintf("%s:%d", *h, *p)
-	_ = intun.LaunchLeaf(*n, address)
+	_ = inc.LaunchRoot(address, *pw)
 
+	fmt.Println("launch on", address)
 	select {}
 
 }

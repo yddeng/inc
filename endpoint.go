@@ -1,4 +1,4 @@
-package intun
+package inc
 
 import (
 	"github.com/yddeng/dnet"

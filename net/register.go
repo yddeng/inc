@@ -1,8 +1,8 @@
 package net
 
 import (
-	"github.com/yddeng/dutil/protocol"
-	"github.com/yddeng/dutil/protocol/protobuf"
+	"github.com/yddeng/utils/protocol"
+	"github.com/yddeng/utils/protocol/protobuf"
 )
 
 var (

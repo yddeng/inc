@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/yddeng/dutil/strutil"
+	"github.com/yddeng/utils/strutil"
 	"io"
 	"os"
 	"os/exec"
