@@ -36,7 +36,6 @@ func command(name string, argv []string) *exec.Cmd {
 	w := io.MultiWriter(os.Stdout, f)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = w
-	cmd.Stderr = os.Stderrssh
 	//stdin, _ := cmd.StdinPipe()
 	return cmd
 }

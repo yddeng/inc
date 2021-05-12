@@ -3,7 +3,8 @@ option go_package = "net";
 
 // 内网服务器注册
 message login_req{
-    string desc = 1;
+    string name = 1;
+    uint32 id   = 2; // 重连带上Id
 }
 
 message login_resp{
@@ -31,7 +32,8 @@ message mapping {
 
 // 注册代理映射
 message register_req{
-    repeated mapping maps = 1;
+    mapping maps = 1;
+    uint32 slave_id = 2;
 }
 
 message register_resp{
@@ -40,7 +42,7 @@ message register_resp{
 
 // 注销代理映射
 message unregister_req{
-    int32 remote_port = 1; // 公网上的端口
+    uint32 map_id = 1;
 }
 
 message unregister_resp{
