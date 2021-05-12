@@ -11,13 +11,9 @@ import (
 )
 
 type channel struct {
-	channelID      uint32
-	acceptorConnID uint32
-
-	mapID        uint32
-	conn         net.Conn
-	dialerConnID uint32
-
+	channelID uint32
+	mapID     uint32
+	conn      net.Conn
 	rpcClient *drpc.Client
 	taskQueue *task.TaskQueue
 	session   dnet.Session

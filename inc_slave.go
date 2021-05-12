@@ -23,7 +23,6 @@ type IncSlave struct {
 	dialing bool
 	session dnet.Session
 
-	counter  uint32
 	dialers  map[uint32]*dialer  // mapId for key,
 	channels map[uint32]*channel // channelId for key,
 }
@@ -125,7 +124,6 @@ func LaunchIncSlave(name, rootAddr string) *IncSlave {
 		taskQueue: taskQueue,
 		rpcServer: drpc.NewServer(),
 		rpcClient: drpc.NewClient(),
-		counter:   1,
 		dialers:   map[uint32]*dialer{},
 		channels:  map[uint32]*channel{},
 	}
@@ -235,14 +233,13 @@ func (this *IncSlave) onOpenChannel(replier *drpc.Replier, req interface{}) {
 	fmt.Println("onOpenChannel", msg)
 
 	ch := &channel{
-		channelID:      msg.GetChannelId(),
-		acceptorConnID: msg.GetAcceptorConnId(),
-		mapID:          msg.GetMapId(),
-		session:        this.session,
-		taskQueue:      this.taskQueue,
-		rpcClient:      this.rpcClient,
+		channelID: msg.GetChannelId(),
+		mapID:     msg.GetMapId(),
+		session:   this.session,
+		taskQueue: this.taskQueue,
+		rpcClient: this.rpcClient,
 	}
-	var connId uint32
+
 	if ch.mapID != 0 {
 		dialer, ok := this.dialers[msg.GetMapId()]
 		if !ok {
@@ -255,10 +252,7 @@ func (this *IncSlave) onOpenChannel(replier *drpc.Replier, req interface{}) {
 			replier.Reply(&net.OpenChannelResp{Msg: "dialer error" + err.Error()}, nil)
 			return
 		}
-
 		ch.conn = conn
-		ch.dialerConnID = this.counter
-		this.counter++
 
 		// read
 		go ch.handleRead(func() {
@@ -271,7 +265,7 @@ func (this *IncSlave) onOpenChannel(replier *drpc.Replier, req interface{}) {
 	}
 
 	this.channels[ch.channelID] = ch
-	replier.Reply(&net.OpenChannelResp{DialerConnId: connId}, nil)
+	replier.Reply(&net.OpenChannelResp{}, nil)
 }
 
 func (this *IncSlave) onCloseChannel(replier *drpc.Replier, req interface{}) {

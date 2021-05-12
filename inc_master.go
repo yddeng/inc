@@ -165,8 +165,6 @@ func (this *IncMaster) onRegister(replier *drpc.Replier, req interface{}) {
 			open := &net.OpenChannelReq{MapId: mapId}
 			open.ChannelId = this.counter
 			this.counter++
-			open.AcceptorConnId = this.counter
-			this.counter++
 
 			this.rpcClient.Go(end, proto.MessageName(open), open, drpc.DefaultRPCTimeout, func(i interface{}, e error) {
 				if e != nil {
@@ -178,14 +176,12 @@ func (this *IncMaster) onRegister(replier *drpc.Replier, req interface{}) {
 				}
 
 				ch := &channel{
-					channelID:      open.GetChannelId(),
-					acceptorConnID: open.GetAcceptorConnId(),
-					mapID:          open.GetMapId(),
-					conn:           conn,
-					dialerConnID:   resp.GetDialerConnId(),
-					rpcClient:      this.rpcClient,
-					taskQueue:      this.taskQueue,
-					session:        end.session,
+					channelID: open.GetChannelId(),
+					mapID:     open.GetMapId(),
+					conn:      conn,
+					rpcClient: this.rpcClient,
+					taskQueue: this.taskQueue,
+					session:   end.session,
 				}
 
 				this.channels[ch.channelID] = ch

@@ -71,13 +71,11 @@ message destroy_dialer_resp{
 // 开启通信隧道
 message open_channel_req{
     uint32 channel_id = 1; // 由公网服务创建
-    uint32 acceptor_conn_id = 2; // 公网 acceptor 分配
-    uint32 map_id = 3; // 没有则表示消息到内网止，不转到dialer
+    uint32 map_id     = 2; // 没有则表示消息到内网止，不转到dialer
 }
 
 message open_channel_resp{
     string msg      = 1;
-    uint32 dialer_conn_id = 2; // 内网 dialer 分配
 }
 
 // 关闭通信隧道
