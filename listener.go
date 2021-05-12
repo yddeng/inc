@@ -1,38 +1,19 @@
 package inc
 
 import (
-	"fmt"
-	"github.com/yddeng/utils/task"
 	"net"
 )
 
 type listener struct {
-	mapID     uint32
-	taskQueue *task.TaskQueue
-	listener  net.Listener
-	counter   uint32
-	conns     map[uint32]*tcpConn
-}
-
-type tcpConn struct {
-	connID uint32
-	net.Conn
+	mapID    uint32
+	listener net.Listener
 }
 
 func (this *listener) destroy() {
-	this.listener.Close()
+	_ = this.listener.Close()
 }
 
-func (this *listener) closeConn(connID uint32) {
-	c, ok := this.conns[connID]
-	if ok {
-		fmt.Printf("conn %d disconnect. ", connID)
-		_ = c.Close()
-		delete(this.conns, connID)
-	}
-}
-
-func (this *listener) listen(addr string, newConn func(conn *tcpConn)) (err error) {
+func (this *listener) listen(addr string, newConn func(conn net.Conn)) (err error) {
 	if this.listener, err = net.Listen("tcp", addr); err != nil {
 		return
 	}
@@ -44,21 +25,17 @@ func (this *listener) listen(addr string, newConn func(conn *tcpConn)) (err erro
 				if ne, ok := err.(net.Error); ok && ne.Temporary() {
 					continue
 				} else {
-					panic(err)
+					return
 				}
 			}
-			this.taskQueue.Push(func() {
-				id := this.counter
-				this.counter++
-				tc := &tcpConn{connID: id, Conn: conn}
-				this.conns[id] = tc
-				go newConn(tc)
-			})
+
+			newConn(conn)
 		}
 	}()
 	return
 }
 
+/*
 func (this *listener) handleConn(conn *tcpConn, f func(b []byte, close bool)) {
 	buf := make([]byte, 1024)
 	for {
@@ -87,3 +64,4 @@ func (this *listener) writeTo(id uint32, b []byte) error {
 	_, err := c.Write(b)
 	return err
 }
+*/

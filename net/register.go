@@ -11,15 +11,15 @@ var (
 )
 
 const (
-	CmdLogin = 101
-	CmdAuth
-	CmdRegister
-	CmdUnregister
-	CmdCreateDialer
-	CmdDestroyDialer
-	CmdOpenChannel
-	CmdCloseChannel
-	CmdChannelMessage
+	CmdLogin          = 101
+	CmdAuth           = 102
+	CmdRegister       = 103
+	CmdUnregister     = 104
+	CmdCreateDialer   = 105
+	CmdDestroyDialer  = 106
+	CmdOpenChannel    = 107
+	CmdCloseChannel   = 108
+	CmdChannelMessage = 109
 )
 
 func init() {

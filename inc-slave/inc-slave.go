@@ -25,17 +25,15 @@ func main() {
 	fmt.Println(logo())
 
 	commandLine := flag.NewFlagSet("inc", flag.ExitOnError)
-	h := commandLine.String("h", "", "--host=HOSTNAME     start server host, required ")
-	p := commandLine.Int("p", 0, "--port=PORT         start server port, required ")
-	n := commandLine.String("pw", "leaf", "--name=NAME     name for leaf, optional ")
+	a := commandLine.String("a", "", "--address     start server host, required ")
+	n := commandLine.String("n", "slave", "--name     name for slave, optional ")
 	commandLine.Parse(os.Args[1:])
 
-	if *h == "" || *p == 0 {
+	if *a == "" {
 		return
 	}
 
-	address := fmt.Sprintf("%s:%d", *h, *p)
-	_ = inc.LaunchLeaf(*n, address)
+	_ = inc.LaunchIncSlave(*n, *a)
 
 	select {}
 

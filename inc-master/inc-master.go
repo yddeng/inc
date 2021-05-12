@@ -27,7 +27,7 @@ func main() {
 	commandLine := flag.NewFlagSet("inc", flag.ExitOnError)
 	h := commandLine.String("h", "", "--host=HOSTNAME     start server host, required ")
 	p := commandLine.Int("p", 0, "--port=PORT         start server port, required ")
-	pw := commandLine.String("pw", "", "--password     for client auth, optional ")
+	t := commandLine.String("t", "", "--token     for client auth, optional ")
 	commandLine.Parse(os.Args[1:])
 
 	if *h == "" || *p == 0 {
@@ -35,7 +35,7 @@ func main() {
 	}
 
 	address := fmt.Sprintf("%s:%d", *h, *p)
-	_ = inc.LaunchRoot(address, *pw)
+	_ = inc.LaunchIncMaster(*h, *p, *t)
 
 	fmt.Println("launch on", address)
 	select {}

@@ -7,7 +7,6 @@ import (
 	"github.com/yddeng/dnet/drpc"
 	"github.com/yddeng/inc/net"
 	"github.com/yddeng/utils/task"
-
 	"reflect"
 	"time"
 )
@@ -24,7 +23,9 @@ type IncSlave struct {
 	dialing bool
 	session dnet.Session
 
-	dialers map[uint32]*dialer
+	counter  uint32
+	dialers  map[uint32]*dialer  // mapId for key,
+	channels map[uint32]*channel // channelId for key,
 }
 
 func (this *IncSlave) SendRequest(req *drpc.Request) error {
@@ -105,6 +106,9 @@ func (this *IncSlave) onConnected(conn dnet.NetConn) {
 
 			fmt.Println("onConnected login center ok")
 			this.id = msg.GetId()
+
+			this.testInit()
+			this.testInit2()
 		}); err != nil {
 			panic(err)
 		}
@@ -119,16 +123,77 @@ func LaunchIncSlave(name, rootAddr string) *IncSlave {
 		name:      name,
 		rAddr:     rootAddr,
 		taskQueue: taskQueue,
-		dialers:   map[uint32]*dialer{},
 		rpcServer: drpc.NewServer(),
 		rpcClient: drpc.NewClient(),
+		counter:   1,
+		dialers:   map[uint32]*dialer{},
+		channels:  map[uint32]*channel{},
 	}
 
-	this.rpcServer.Register(proto.MessageName(&net.CreateDialerReq{}), leaf.onCreateDialer)
-	this.rpcServer.Register(proto.MessageName(&net.DestroyDialerReq{}), leaf.onDestroyDialer)
+	this.rpcServer.Register(proto.MessageName(&net.CreateDialerReq{}), this.onCreateDialer)
+	this.rpcServer.Register(proto.MessageName(&net.DestroyDialerReq{}), this.onDestroyDialer)
+	this.rpcServer.Register(proto.MessageName(&net.OpenChannelReq{}), this.onOpenChannel)
+	this.rpcServer.Register(proto.MessageName(&net.CloseChannelReq{}), this.onCloseChannel)
+	this.rpcServer.Register(proto.MessageName(&net.ChannelMessageReq{}), this.onChannelMessage)
 
 	this.taskQueue.Push(func() { this.dial() })
 	return this
+
+}
+
+func (this *IncSlave) testInit() {
+	req := &net.RegisterReq{
+		Maps: &net.Mapping{
+			LocalIp:     "10.128.2.123",
+			LocalPort:   22,
+			RemotePort:  2346,
+			Description: "ssh",
+		},
+		SlaveId: this.id,
+	}
+
+	_ = this.rpcClient.Go(this, proto.MessageName(req), req, drpc.DefaultRPCTimeout, func(i interface{}, e error) {
+		if e != nil {
+			fmt.Printf("testInit error %s", e.Error())
+			return
+		}
+
+		msg := i.(*net.RegisterResp)
+		if msg.GetMsg() != "" {
+			fmt.Printf("testInit msg %s", msg.GetMsg())
+			return
+		}
+
+		fmt.Println("testInit ok")
+	})
+
+}
+
+func (this *IncSlave) testInit2() {
+	req := &net.RegisterReq{
+		Maps: &net.Mapping{
+			LocalIp:     "127.0.0.1",
+			LocalPort:   5432,
+			RemotePort:  2345,
+			Description: "psql",
+		},
+		SlaveId: this.id,
+	}
+
+	_ = this.rpcClient.Go(this, proto.MessageName(req), req, drpc.DefaultRPCTimeout, func(i interface{}, e error) {
+		if e != nil {
+			fmt.Printf("testInit error %s", e.Error())
+			return
+		}
+
+		msg := i.(*net.RegisterResp)
+		if msg.GetMsg() != "" {
+			fmt.Printf("testInit msg %s", msg.GetMsg())
+			return
+		}
+
+		fmt.Println("testInit ok")
+	})
 
 }
 
@@ -138,14 +203,14 @@ func (this *IncSlave) onCreateDialer(replier *drpc.Replier, req interface{}) {
 
 	dialer := &dialer{mapID: msg.GetMapId(), address: msg.GetAddress()}
 
-	//test
+	// test
 	conn, err := dialer.dial()
 	if err != nil {
 		replier.Reply(&net.CreateDialerResp{Msg: "dial error" + err.Error()}, nil)
 		return
 	}
 
-	dialer.closeConn(conn.connID)
+	_ = conn.Close()
 
 	this.dialers[dialer.mapID] = dialer
 	replier.Reply(&net.CreateDialerResp{}, nil)
@@ -161,7 +226,89 @@ func (this *IncSlave) onDestroyDialer(replier *drpc.Replier, req interface{}) {
 		return
 	}
 
-	dialer.destroy()
-	delete(this.dialers, msg.GetMapId())
+	delete(this.dialers, dialer.mapID)
 	replier.Reply(&net.DestroyDialerResp{}, nil)
+}
+
+func (this *IncSlave) onOpenChannel(replier *drpc.Replier, req interface{}) {
+	msg := req.(*net.OpenChannelReq)
+	fmt.Println("onOpenChannel", msg)
+
+	ch := &channel{
+		channelID:      msg.GetChannelId(),
+		acceptorConnID: msg.GetAcceptorConnId(),
+		mapID:          msg.GetMapId(),
+		session:        this.session,
+		taskQueue:      this.taskQueue,
+		rpcClient:      this.rpcClient,
+	}
+	var connId uint32
+	if ch.mapID != 0 {
+		dialer, ok := this.dialers[msg.GetMapId()]
+		if !ok {
+			replier.Reply(&net.OpenChannelResp{Msg: "dialer is not exist"}, nil)
+			return
+		}
+
+		conn, err := dialer.dial()
+		if err != nil {
+			replier.Reply(&net.OpenChannelResp{Msg: "dialer error" + err.Error()}, nil)
+			return
+		}
+
+		ch.conn = conn
+		ch.dialerConnID = this.counter
+		this.counter++
+
+		// read
+		go ch.handleRead(func() {
+			this.taskQueue.Push(func() {
+				ch.close()
+				delete(this.channels, ch.channelID)
+			})
+		})
+
+	}
+
+	this.channels[ch.channelID] = ch
+	replier.Reply(&net.OpenChannelResp{DialerConnId: connId}, nil)
+}
+
+func (this *IncSlave) onCloseChannel(replier *drpc.Replier, req interface{}) {
+	msg := req.(*net.CloseChannelReq)
+	fmt.Println("onCloseChannel", msg)
+
+	ch, ok := this.channels[msg.GetChannelId()]
+	if !ok {
+		// 默认已经关闭
+		replier.Reply(&net.CloseChannelResp{}, nil)
+		return
+	}
+
+	ch.close()
+	delete(this.channels, ch.channelID)
+	replier.Reply(&net.CloseChannelResp{}, nil)
+}
+
+func (this *IncSlave) onChannelMessage(replier *drpc.Replier, req interface{}) {
+	msg := req.(*net.ChannelMessageReq)
+	fmt.Println("onChannelMessage", msg.GetChannelId())
+
+	ch, ok := this.channels[msg.GetChannelId()]
+	if !ok {
+		replier.Reply(&net.ChannelMessageResp{Msg: "channel is not exit"}, nil)
+		return
+	}
+
+	if ch.conn != nil {
+		if err := ch.writeTo(msg.GetData()); err != nil {
+			ch.close()
+			delete(this.channels, ch.channelID)
+			replier.Reply(&net.ChannelMessageResp{Msg: "channel writeTo error" + err.Error()}, nil)
+			return
+		}
+	} else {
+
+	}
+	replier.Reply(&net.ChannelMessageResp{}, nil)
 }

@@ -45,15 +45,14 @@ func main() {
 	fmt.Println(logo())
 
 	commandLine := flag.NewFlagSet("inc", flag.ExitOnError)
-	h := commandLine.String("h", "", "--host=HOSTNAME     start server host, required ")
-	p := commandLine.Int("p", 0, "--port=PORT         start server port, required ")
+	a := commandLine.String("a", "", "--host=HOSTNAME     start server host, required ")
 	commandLine.Parse(os.Args[1:])
 
-	if *h == "" || *p == 0 {
+	if *a == "" {
 		return
 	}
 
-	fmt.Print("Password to connection root:")
+	fmt.Print("Password to connection master:")
 	pw := readLine()
 
 	address := fmt.Sprintf("%s:%d", *h, *p)
@@ -104,10 +103,6 @@ loop:
 
 }
 
-func cmdExec(name string, argv []string) *exec.Cmd {
-	cmd := exec.Command(name, argv[1:]...)
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	return cmd
+func register() {
+
 }
