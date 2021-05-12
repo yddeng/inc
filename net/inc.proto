@@ -28,6 +28,8 @@ message mapping {
     int32  internal_port  = 2; // 内网代理端口
     int32  external_port  = 3; // 外网端口
     string description    = 4;
+    uint32 map_id         = 5; // usage for list
+    uint32 slave_id       = 6; // usage for list
 }
 
 // 注册代理映射
@@ -95,4 +97,13 @@ message channel_message_req{
 
 message channel_message_resp{
     string msg      = 1;
+}
+
+// command line
+message client_cmd_req{
+    string cmd = 1;
+}
+
+message client_cmd_resp{
+    bytes data = 1;
 }

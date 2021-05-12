@@ -20,13 +20,13 @@ const (
 	CmdOpenChannel    = 107
 	CmdCloseChannel   = 108
 	CmdChannelMessage = 109
+	CmdClientCommand  = 110
 )
 
 func init() {
 	pbReq = protocol.NewProtoc(&protobuf.Protobuf{})
 	pbResp = protocol.NewProtoc(&protobuf.Protobuf{})
 
-	// proxy
 	pbReq.Register(CmdLogin, &LoginReq{})
 	pbReq.Register(CmdAuth, &AuthReq{})
 	pbReq.Register(CmdRegister, &RegisterReq{})
@@ -36,6 +36,7 @@ func init() {
 	pbReq.Register(CmdOpenChannel, &OpenChannelReq{})
 	pbReq.Register(CmdCloseChannel, &CloseChannelReq{})
 	pbReq.Register(CmdChannelMessage, &ChannelMessageReq{})
+	pbReq.Register(CmdClientCommand, &ClientCmdReq{})
 
 	pbResp.Register(CmdLogin, &LoginResp{})
 	pbResp.Register(CmdAuth, &AuthResp{})
@@ -46,5 +47,6 @@ func init() {
 	pbResp.Register(CmdOpenChannel, &OpenChannelResp{})
 	pbResp.Register(CmdCloseChannel, &CloseChannelResp{})
 	pbResp.Register(CmdChannelMessage, &ChannelMessageResp{})
+	pbResp.Register(CmdClientCommand, &ClientCmdResp{})
 
 }

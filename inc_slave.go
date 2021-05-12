@@ -285,7 +285,7 @@ func (this *IncSlave) onCloseChannel(replier *drpc.Replier, req interface{}) {
 
 func (this *IncSlave) onChannelMessage(replier *drpc.Replier, req interface{}) {
 	msg := req.(*net.ChannelMessageReq)
-	fmt.Println("onChannelMessage", msg.GetChannelId())
+	//fmt.Println("onChannelMessage", msg.GetChannelId())
 
 	ch, ok := this.channels[msg.GetChannelId()]
 	if !ok {

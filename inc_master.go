@@ -1,6 +1,7 @@
 package inc
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	"github.com/yddeng/dnet"
@@ -51,6 +52,7 @@ func LaunchIncMaster(ip string, port int, token string) *IncMaster {
 	this.rpcServer.Register(proto.MessageName(&net.UnregisterReq{}), this.onUnregister)
 	this.rpcServer.Register(proto.MessageName(&net.CloseChannelReq{}), this.onCloseChannel)
 	this.rpcServer.Register(proto.MessageName(&net.ChannelMessageReq{}), this.onChannelMessage)
+	this.rpcServer.Register(proto.MessageName(&net.ClientCmdReq{}), this.onClientCommand)
 
 	this.launch()
 	return this
@@ -221,10 +223,11 @@ func (this *IncMaster) onRegister(replier *drpc.Replier, req interface{}) {
 			return
 		}
 
+		mapInfo := msg.GetMaps()
+		mapInfo.MapId = mapId
+		mapInfo.SlaveId = msg.GetSlaveId()
 		this.mapping[mapId] = &mapping{
-			mapId:    mapId,
-			slaveId:  msg.GetSlaveId(),
-			info:     msg.GetMaps(),
+			info:     mapInfo,
 			listener: l,
 		}
 		replier.Reply(&net.RegisterResp{}, nil)
@@ -242,7 +245,7 @@ func (this *IncMaster) onUnregister(replier *drpc.Replier, req interface{}) {
 		replier.Reply(&net.UnregisterResp{Msg: "mapping is not exist "}, nil)
 		return
 	}
-	slaveId := m.slaveId
+	slaveId := m.info.GetSlaveId()
 
 	end, ok := this.ends[slaveId]
 	if !ok {
@@ -291,7 +294,7 @@ func (this *IncMaster) onCloseChannel(replier *drpc.Replier, req interface{}) {
 
 func (this *IncMaster) onChannelMessage(replier *drpc.Replier, req interface{}) {
 	msg := req.(*net.ChannelMessageReq)
-	fmt.Println("onChannelMessage", msg.GetChannelId())
+	//fmt.Println("onChannelMessage", msg.GetChannelId())
 
 	ch, ok := this.channels[msg.GetChannelId()]
 	if !ok {
@@ -310,4 +313,22 @@ func (this *IncMaster) onChannelMessage(replier *drpc.Replier, req interface{}) 
 
 	}
 	replier.Reply(&net.ChannelMessageResp{}, nil)
+}
+
+func (this *IncMaster) onClientCommand(replier *drpc.Replier, req interface{}) {
+	msg := req.(*net.ClientCmdReq)
+
+	var b []byte
+	switch msg.GetCmd() {
+	case "ml":
+		ms := make([]*net.Mapping, 0, len(this.mapping))
+		for _, v := range this.mapping {
+			ms = append(ms, v.info)
+			fmt.Println(v.info)
+		}
+		b, _ = json.Marshal(ms)
+	default:
+
+	}
+	replier.Reply(&net.ClientCmdResp{Data: b}, nil)
 }
