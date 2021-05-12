@@ -1,5 +1,6 @@
 package inc
 
+/*
 import (
 	"fmt"
 	"github.com/golang/protobuf/proto"
@@ -229,3 +230,4 @@ func (this *dialer) handleConn() {
 
 	}()
 }
+*/

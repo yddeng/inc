@@ -1,0 +1,98 @@
+syntax = "proto3";
+option go_package = "net";
+
+// 内网服务器注册
+message login_req{
+    string desc = 1;
+}
+
+message login_resp{
+    string msg = 1;
+    uint32 id  = 2;
+}
+
+// 命令行客户端连接
+message auth_req{
+    string token = 1;
+}
+
+message auth_resp{
+    string msg = 1;
+    uint32 id  = 2;
+}
+
+// 代理映射
+message mapping {
+    string local_ip    = 1;
+    int32  local_port  = 2;
+    int32  remote_port = 3;
+    string description = 4;
+}
+
+// 注册代理映射
+message register_req{
+    repeated mapping maps = 1;
+}
+
+message register_resp{
+    string msg = 1;
+}
+
+// 注销代理映射
+message unregister_req{
+    int32 remote_port = 1; // 公网上的端口
+}
+
+message unregister_resp{
+    string msg = 1;
+}
+
+// 创建映射连接器
+message create_dialer_req{
+    uint32 map_id  = 1; // 与注册的代理映射一一对应
+    string address = 2;
+}
+
+message create_dialer_resp{
+    string msg = 1;
+}
+
+// 销毁映射连接器
+message destroy_dialer_req{
+    uint32 map_id  = 1;
+}
+
+message destroy_dialer_resp{
+    string msg = 1;
+}
+
+// 开启通信隧道
+message open_channel_req{
+    uint32 channel_id = 1; // 由公网服务创建
+    uint32 acceptor_conn_id = 2; // 公网 acceptor 分配
+    uint32 map_id = 3; // 没有则表示消息到内网止，不转到dialer
+}
+
+message open_channel_resp{
+    string msg      = 1;
+    uint32 dialer_conn_id = 2; // 内网 dialer 分配
+}
+
+// 关闭通信隧道
+message close_channel_req{
+    uint32 channel_id = 1;
+}
+
+message close_channel_resp{
+    string msg      = 1;
+}
+
+// 隧道消息
+message channel_message_req{
+    uint32 channel_id = 1;
+    bytes  data       = 2;
+}
+
+message channel_message_resp{
+    string msg      = 1;
+}

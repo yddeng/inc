@@ -1,5 +1,6 @@
 package inc
 
+/*
 import (
 	"fmt"
 	"github.com/golang/protobuf/proto"
@@ -250,3 +251,4 @@ func (this *acceptor) handleConn(conn net2.Conn) {
 		}()
 	})
 }
+*/

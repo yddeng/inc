@@ -11,20 +11,15 @@ var (
 )
 
 const (
-	CmdProxyRegister   = 101
-	CmdProxyUnregister = 102
-	CmdProxyList       = 103
-	CmdProxyMessage    = 104
-)
-
-const (
-	CmdLeafRegister  = 1
-	CmdCliAuth       = 2
-	CmdCliCommand    = 3
-	CmdCreateTunnel  = 4
-	CmdTunnelMessage = 5
-	CmdHeartbeat     = 6
-	CmdCloseTunnel   = 7
+	CmdLogin = 101
+	CmdAuth
+	CmdRegister
+	CmdUnregister
+	CmdCreateDialer
+	CmdDestroyDialer
+	CmdOpenChannel
+	CmdCloseChannel
+	CmdChannelMessage
 )
 
 func init() {
@@ -32,31 +27,24 @@ func init() {
 	pbResp = protocol.NewProtoc(&protobuf.Protobuf{})
 
 	// proxy
-	pbReq.Register(CmdProxyRegister, &ProxyRegisterReq{})
-	pbReq.Register(CmdProxyUnregister, &ProxyUnregisterReq{})
-	pbReq.Register(CmdProxyList, &ProxyListReq{})
-	pbReq.Register(CmdProxyMessage, &ProxyMessageReq{})
+	pbReq.Register(CmdLogin, &LoginReq{})
+	pbReq.Register(CmdAuth, &AuthReq{})
+	pbReq.Register(CmdRegister, &RegisterReq{})
+	pbReq.Register(CmdUnregister, &UnregisterReq{})
+	pbReq.Register(CmdCreateDialer, &CreateDialerReq{})
+	pbReq.Register(CmdDestroyDialer, &DestroyDialerReq{})
+	pbReq.Register(CmdOpenChannel, &OpenChannelReq{})
+	pbReq.Register(CmdCloseChannel, &CloseChannelReq{})
+	pbReq.Register(CmdChannelMessage, &ChannelMessageReq{})
 
-	pbResp.Register(CmdProxyRegister, &ProxyRegisterResp{})
-	pbResp.Register(CmdProxyUnregister, &ProxyUnregisterResp{})
-	pbResp.Register(CmdProxyList, &ProxyListResp{})
-	pbResp.Register(CmdProxyMessage, &ProxyMessageResp{})
-
-	//
-	pbReq.Register(CmdLeafRegister, &LeafRegisterReq{})
-	pbReq.Register(CmdCliAuth, &CliAuthReq{})
-	pbReq.Register(CmdCliCommand, &CliCommandReq{})
-	pbReq.Register(CmdCreateTunnel, &CreateTunnelReq{})
-	pbReq.Register(CmdTunnelMessage, &TunnelMessageReq{})
-	pbReq.Register(CmdHeartbeat, &Heartbeat{})
-	pbReq.Register(CmdCloseTunnel, &CloseTunnelReq{})
-
-	pbResp.Register(CmdLeafRegister, &LeafRegisterResp{})
-	pbResp.Register(CmdCliAuth, &CliAuthResp{})
-	pbResp.Register(CmdCliCommand, &CliCommandResp{})
-	pbResp.Register(CmdCreateTunnel, &CreateTunnelResp{})
-	pbResp.Register(CmdTunnelMessage, &TunnelMessageResp{})
-	pbResp.Register(CmdHeartbeat, &Heartbeat{})
-	pbResp.Register(CmdCloseTunnel, &CloseTunnelResp{})
+	pbResp.Register(CmdLogin, &LoginResp{})
+	pbResp.Register(CmdAuth, &AuthResp{})
+	pbResp.Register(CmdRegister, &RegisterResp{})
+	pbResp.Register(CmdUnregister, &UnregisterResp{})
+	pbResp.Register(CmdCreateDialer, &CreateDialerResp{})
+	pbResp.Register(CmdDestroyDialer, &DestroyDialerResp{})
+	pbResp.Register(CmdOpenChannel, &OpenChannelResp{})
+	pbResp.Register(CmdCloseChannel, &CloseChannelResp{})
+	pbResp.Register(CmdChannelMessage, &ChannelMessageResp{})
 
 }

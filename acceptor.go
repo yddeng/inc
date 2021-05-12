@@ -2,34 +2,37 @@ package inc
 
 import (
 	"fmt"
-	"github.com/golang/protobuf/proto"
-	"github.com/yddeng/dnet/drpc"
 	"github.com/yddeng/utils/task"
 	"net"
 )
 
 type acceptor struct {
+	channelID uint32
 	taskQueue *task.TaskQueue
-	id        uint32
 	listener  net.Listener
 	counter   uint32
-	conns     map[uint32]net.Conn
+	conns     map[uint32]*tcpConn
+}
+
+type tcpConn struct {
+	connID uint32
+	net.Conn
 }
 
 func (this *acceptor) close() {
 	this.listener.Close()
 }
 
-func (this *acceptor) disconnect(id uint32) {
-	c, ok := this.conns[id]
+func (this *acceptor) disconnect(connID uint32) {
+	c, ok := this.conns[connID]
 	if ok {
-		fmt.Printf("conn %d disconnect. ", id)
+		fmt.Printf("conn %d disconnect. ", connID)
 		_ = c.Close()
-		delete(this.conns, id)
+		delete(this.conns, connID)
 	}
 }
 
-func (this *acceptor) listen(addr string) (err error) {
+func (this *acceptor) listen(addr string, f func(b []byte, close bool)) (err error) {
 	if this.listener, err = net.Listen("tcp", addr); err != nil {
 		return
 	}
@@ -44,37 +47,30 @@ func (this *acceptor) listen(addr string) (err error) {
 					panic(err)
 				}
 			}
-			this.handleConn(conn)
+			this.handleConn(conn, f)
 		}
 	}()
 	return
 }
 
-func (this *acceptor) handleConn(conn net.Conn) {
+func (this *acceptor) handleConn(conn net.Conn, f func(b []byte, close bool)) {
 	this.taskQueue.Push(func() {
 		id := this.counter
 		this.counter++
-		this.conns[id] = conn
+		this.conns[id] = &tcpConn{connID: id, Conn: conn}
 
 		go func() {
 			buf := make([]byte, 1024)
 			for {
-				msg := &net.TunnelMessageReq{TunID: this.tunID, ConnID: id}
-
 				n, err := conn.Read(buf)
 				if err != nil {
 					fmt.Println("client.Read", err)
-					msg.Close = true
-					_, _ = this.client.rpcClient.Call(this.client, proto.MessageName(msg), msg, drpc.DefaultRPCTimeout)
+					f(nil, true)
 					break
 				}
 
 				fmt.Println("client.Read", buf[:n])
-				msg.Data = buf[:n]
-				if _, err := this.client.rpcClient.Call(this.client, proto.MessageName(msg), msg, drpc.DefaultRPCTimeout); err != nil {
-					break
-				}
-
+				f(buf[:n], false)
 			}
 
 			this.taskQueue.Push(func() {

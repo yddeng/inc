@@ -1,5 +1,6 @@
 package inc
 
+/*
 import (
 	"fmt"
 	"github.com/golang/protobuf/proto"
@@ -209,3 +210,4 @@ func (this *Root) onTunnelMessage(replier *drpc.Replier, req interface{}) {
 
 	})
 }
+*/
