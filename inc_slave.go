@@ -16,9 +16,10 @@ type IncSlave struct {
 	rpcServer *drpc.Server
 	rpcClient *drpc.Client
 
-	id    uint32
-	name  string
-	rAddr string
+	id      uint32
+	name    string
+	rAddr   string
+	mapping *net.Mapping
 
 	dialing bool
 	session dnet.Session
@@ -106,21 +107,23 @@ func (this *IncSlave) onConnected(conn dnet.NetConn) {
 			fmt.Println("onConnected login center ok")
 			this.id = msg.GetId()
 
-			this.testInit()
-			this.testInit2()
+			if this.mapping != nil {
+				this.register(this.mapping)
+			}
 		}); err != nil {
 			panic(err)
 		}
 	})
 }
 
-func LaunchIncSlave(name, rootAddr string) *IncSlave {
+func LaunchIncSlave(name, rootAddr string, mapping *net.Mapping) *IncSlave {
 	taskQueue := task.NewTaskQueue(512)
 	taskQueue.Run()
 
 	this := &IncSlave{
 		name:      name,
 		rAddr:     rootAddr,
+		mapping:   mapping,
 		taskQueue: taskQueue,
 		rpcServer: drpc.NewServer(),
 		rpcClient: drpc.NewClient(),
@@ -139,58 +142,25 @@ func LaunchIncSlave(name, rootAddr string) *IncSlave {
 
 }
 
-func (this *IncSlave) testInit() {
+func (this *IncSlave) register(mapping *net.Mapping) {
 	req := &net.RegisterReq{
-		Maps: &net.Mapping{
-			InternalIp:   "10.128.2.123",
-			InternalPort: 22,
-			ExternalPort: 2346,
-			Description:  "ssh",
-		},
+		Maps:    mapping,
 		SlaveId: this.id,
 	}
 
 	_ = this.rpcClient.Go(this, proto.MessageName(req), req, drpc.DefaultRPCTimeout, func(i interface{}, e error) {
 		if e != nil {
-			fmt.Printf("testInit error %s", e.Error())
+			fmt.Printf("register error %s", e.Error())
 			return
 		}
 
 		msg := i.(*net.RegisterResp)
 		if msg.GetMsg() != "" {
-			fmt.Printf("testInit msg %s", msg.GetMsg())
+			fmt.Printf("register msg %s", msg.GetMsg())
 			return
 		}
 
-		fmt.Println("testInit ok")
-	})
-
-}
-
-func (this *IncSlave) testInit2() {
-	req := &net.RegisterReq{
-		Maps: &net.Mapping{
-			InternalIp:   "127.0.0.1",
-			InternalPort: 5432,
-			ExternalPort: 2345,
-			Description:  "psql",
-		},
-		SlaveId: this.id,
-	}
-
-	_ = this.rpcClient.Go(this, proto.MessageName(req), req, drpc.DefaultRPCTimeout, func(i interface{}, e error) {
-		if e != nil {
-			fmt.Printf("testInit error %s", e.Error())
-			return
-		}
-
-		msg := i.(*net.RegisterResp)
-		if msg.GetMsg() != "" {
-			fmt.Printf("testInit msg %s", msg.GetMsg())
-			return
-		}
-
-		fmt.Println("testInit ok")
+		fmt.Println("register", mapping.String(), " ok")
 	})
 
 }
