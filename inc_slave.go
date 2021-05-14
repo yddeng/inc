@@ -16,10 +16,10 @@ type IncSlave struct {
 	rpcServer *drpc.Server
 	rpcClient *drpc.Client
 
-	id      uint32
-	name    string
-	rAddr   string
-	mapping *net.Mapping
+	id       uint32
+	name     string
+	rAddr    string
+	mappings []*net.Mapping
 
 	dialing bool
 	session dnet.Session
@@ -107,23 +107,22 @@ func (this *IncSlave) onConnected(conn dnet.NetConn) {
 			fmt.Println("onConnected login center ok")
 			this.id = msg.GetId()
 
-			if this.mapping != nil {
-				this.register(this.mapping)
-			}
+			this.register()
+
 		}); err != nil {
 			panic(err)
 		}
 	})
 }
 
-func LaunchIncSlave(name, rootAddr string, mapping *net.Mapping) *IncSlave {
+func LaunchIncSlave(name, rootAddr string, mappings []*net.Mapping) *IncSlave {
 	taskQueue := task.NewTaskQueue(512)
 	taskQueue.Run()
 
 	this := &IncSlave{
 		name:      name,
 		rAddr:     rootAddr,
-		mapping:   mapping,
+		mappings:  mappings,
 		taskQueue: taskQueue,
 		rpcServer: drpc.NewServer(),
 		rpcClient: drpc.NewClient(),
@@ -142,26 +141,28 @@ func LaunchIncSlave(name, rootAddr string, mapping *net.Mapping) *IncSlave {
 
 }
 
-func (this *IncSlave) register(mapping *net.Mapping) {
-	req := &net.RegisterReq{
-		Maps:    mapping,
-		SlaveId: this.id,
+func (this *IncSlave) register() {
+	for _, m := range this.mappings {
+		req := &net.RegisterReq{
+			Maps:    m,
+			SlaveId: this.id,
+		}
+
+		_ = this.rpcClient.Go(this, proto.MessageName(req), req, drpc.DefaultRPCTimeout, func(i interface{}, e error) {
+			if e != nil {
+				fmt.Printf("register %s error %s\n", m.String(), e.Error())
+				return
+			}
+
+			msg := i.(*net.RegisterResp)
+			if msg.GetMsg() != "" {
+				fmt.Printf("register %s msg %s\n", m.String(), msg.GetMsg())
+				return
+			}
+
+			fmt.Printf("register %s ok\n", m.String())
+		})
 	}
-
-	_ = this.rpcClient.Go(this, proto.MessageName(req), req, drpc.DefaultRPCTimeout, func(i interface{}, e error) {
-		if e != nil {
-			fmt.Printf("register error %s", e.Error())
-			return
-		}
-
-		msg := i.(*net.RegisterResp)
-		if msg.GetMsg() != "" {
-			fmt.Printf("register msg %s", msg.GetMsg())
-			return
-		}
-
-		fmt.Println("register", mapping.String(), " ok")
-	})
 
 }
 
@@ -174,7 +175,7 @@ func (this *IncSlave) onCreateDialer(replier *drpc.Replier, req interface{}) {
 	// test
 	conn, err := dialer.dial()
 	if err != nil {
-		replier.Reply(&net.CreateDialerResp{Msg: "dial error" + err.Error()}, nil)
+		replier.Reply(&net.CreateDialerResp{Msg: err.Error()}, nil)
 		return
 	}
 

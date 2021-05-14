@@ -104,6 +104,7 @@ func (this *IncMaster) onClose(session dnet.Session, reason error) {
 		end := ctx.(*endpoint)
 		end.session.SetContext(nil)
 		end.session = nil
+
 		delete(this.ends, end.uId)
 	}
 }
@@ -219,7 +220,7 @@ func (this *IncMaster) onRegister(replier *drpc.Replier, req interface{}) {
 		resp := i.(*net.CreateDialerResp)
 		if resp.GetMsg() != "" {
 			l.destroy()
-			replier.Reply(&net.RegisterResp{Msg: e.Error()}, nil)
+			replier.Reply(&net.RegisterResp{Msg: resp.GetMsg()}, nil)
 			return
 		}
 
