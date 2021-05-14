@@ -1,7 +1,6 @@
 package inc
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	"github.com/yddeng/dnet"
@@ -23,10 +22,12 @@ type IncMaster struct {
 	token    string
 	acceptor dnet.Acceptor
 
-	counter  uint32
-	mapping  map[uint32]*mapping  // mapId
-	channels map[uint32]*channel  // atoi
-	ends     map[uint32]*endpoint // atoi
+	counter   uint32
+	slaves    map[uint32]*slave
+	clients   map[uint32]*client
+	mapping   map[uint32]*net.Mapping
+	listeners map[uint32]*listener
+	channels  map[uint32]*channel
 }
 
 func LaunchIncMaster(ip string, port int, token string) *IncMaster {
@@ -41,9 +42,11 @@ func LaunchIncMaster(ip string, port int, token string) *IncMaster {
 		rpcServer: drpc.NewServer(),
 		rpcClient: drpc.NewClient(),
 		counter:   1,
-		mapping:   map[uint32]*mapping{},
+		slaves:    map[uint32]*slave{},
+		clients:   map[uint32]*client{},
+		mapping:   map[uint32]*net.Mapping{},
+		listeners: map[uint32]*listener{},
 		channels:  map[uint32]*channel{},
-		ends:      map[uint32]*endpoint{},
 	}
 
 	this.rpcServer.Register(proto.MessageName(&net.LoginReq{}), this.onLogin)
@@ -52,7 +55,7 @@ func LaunchIncMaster(ip string, port int, token string) *IncMaster {
 	this.rpcServer.Register(proto.MessageName(&net.UnregisterReq{}), this.onUnregister)
 	this.rpcServer.Register(proto.MessageName(&net.CloseChannelReq{}), this.onCloseChannel)
 	this.rpcServer.Register(proto.MessageName(&net.ChannelMessageReq{}), this.onChannelMessage)
-	this.rpcServer.Register(proto.MessageName(&net.ClientCmdReq{}), this.onClientCommand)
+	//this.rpcServer.Register(proto.MessageName(&net.ClientCmdReq{}), this.onClientCommand)
 
 	this.launch()
 	return this
@@ -72,12 +75,7 @@ func (this *IncMaster) launch() {
 						var err error
 						switch data.(type) {
 						case *drpc.Request:
-							ctx := session.Context()
-							if ctx == nil {
-								err = this.rpcServer.OnRPCRequest(&endpoint{session: session}, data.(*drpc.Request))
-							} else {
-								err = this.rpcServer.OnRPCRequest(ctx.(*endpoint), data.(*drpc.Request))
-							}
+							err = this.rpcServer.OnRPCRequest(&endpoint{session: session}, data.(*drpc.Request))
 						case *drpc.Response:
 							err = this.rpcClient.OnRPCResponse(data.(*drpc.Response))
 						default:
@@ -101,11 +99,46 @@ func (this *IncMaster) onClose(session dnet.Session, reason error) {
 	fmt.Println("onClose", reason)
 	ctx := session.Context()
 	if ctx != nil {
-		end := ctx.(*endpoint)
-		end.session.SetContext(nil)
-		end.session = nil
+		switch ctx.(type) {
+		case *slave:
+			s := ctx.(*slave)
+			remMapIDs := []uint32{}
+			for mapId, m := range this.mapping {
+				if m.GetSlaveId() == s.id {
+					remMapIDs = append(remMapIDs, mapId)
+				}
+			}
 
-		delete(this.ends, end.uId)
+			channels := []uint32{}
+			for _, mapId := range remMapIDs {
+				delete(this.mapping, mapId)
+				if l, ok := this.listeners[mapId]; ok {
+					l.destroy()
+					delete(this.listeners, mapId)
+				}
+				for cId, c := range this.channels {
+					if c.mapID == mapId {
+						channels = append(channels, cId)
+					}
+				}
+			}
+
+			for _, cId := range channels {
+				if c, ok := this.channels[cId]; ok {
+					c.close()
+					delete(this.channels, cId)
+				}
+			}
+
+			s.session.SetContext(nil)
+			s.session = nil
+			delete(this.slaves, s.id)
+		case *client:
+			c := ctx.(*client)
+			c.session.SetContext(nil)
+			c.session = nil
+			delete(this.clients, c.id)
+		}
 	}
 }
 
@@ -117,16 +150,21 @@ func (this *IncMaster) onLogin(replier *drpc.Replier, req interface{}) {
 	end := replier.Channel.(*endpoint)
 	msg := req.(*net.LoginReq)
 
-	end.uId = this.counter
+	id := this.counter
 	this.counter++
 
-	end.name = msg.GetName()
-	end.isSlave = true
+	s := &slave{
+		endpoint: &endpoint{
+			id:      id,
+			session: end.session,
+		},
+		name: msg.GetName(),
+	}
 
-	this.ends[end.uId] = end
-	end.session.SetContext(end)
-	fmt.Println("onLogin slave", end.uId)
-	_ = replier.Reply(&net.LoginResp{Id: end.uId}, nil)
+	this.slaves[id] = s
+	s.session.SetContext(s)
+	fmt.Println("onLogin slave", id)
+	_ = replier.Reply(&net.LoginResp{Id: id}, nil)
 }
 
 func (this *IncMaster) onAuth(replier *drpc.Replier, req interface{}) {
@@ -138,27 +176,31 @@ func (this *IncMaster) onAuth(replier *drpc.Replier, req interface{}) {
 		return
 	}
 
-	end.uId = this.counter
+	id := this.counter
 	this.counter++
 
-	this.ends[end.uId] = end
-	end.session.SetContext(end)
-	fmt.Println("onAuth client", end.uId)
-	_ = replier.Reply(&net.AuthResp{Id: end.uId}, nil)
+	c := &client{&endpoint{
+		id:      id,
+		session: end.session,
+	}}
+	this.clients[id] = c
+	c.session.SetContext(c)
+	fmt.Println("onAuth client", id)
+	_ = replier.Reply(&net.AuthResp{Id: id}, nil)
 }
 
 func (this *IncMaster) onRegister(replier *drpc.Replier, req interface{}) {
 	msg := req.(*net.RegisterReq)
-	mapId := this.counter
-	this.counter++
-
 	fmt.Println("onRegister", msg)
 
-	end, ok := this.ends[msg.GetSlaveId()]
+	s, ok := this.slaves[msg.GetSlaveId()]
 	if !ok {
 		replier.Reply(&net.RegisterResp{Msg: "slave is not exist "}, nil)
 		return
 	}
+
+	mapId := this.counter
+	this.counter++
 
 	// listener
 	l := &listener{mapID: mapId}
@@ -169,7 +211,7 @@ func (this *IncMaster) onRegister(replier *drpc.Replier, req interface{}) {
 			open.ChannelId = this.counter
 			this.counter++
 
-			this.rpcClient.Go(end, proto.MessageName(open), open, drpc.DefaultRPCTimeout, func(i interface{}, e error) {
+			this.rpcClient.Go(s, proto.MessageName(open), open, drpc.DefaultRPCTimeout, func(i interface{}, e error) {
 				if e != nil {
 					return
 				}
@@ -185,7 +227,7 @@ func (this *IncMaster) onRegister(replier *drpc.Replier, req interface{}) {
 					mapID:     open.GetMapId(),
 					conn:      conn,
 					rpcClient: this.rpcClient,
-					session:   end.session,
+					session:   s.session,
 				}
 
 				this.channels[ch.channelID] = ch
@@ -210,7 +252,7 @@ func (this *IncMaster) onRegister(replier *drpc.Replier, req interface{}) {
 		Address: dialerAddr,
 	}
 
-	this.rpcClient.Go(end, proto.MessageName(create), create, drpc.DefaultRPCTimeout, func(i interface{}, e error) {
+	this.rpcClient.Go(s, proto.MessageName(create), create, drpc.DefaultRPCTimeout, func(i interface{}, e error) {
 		if e != nil {
 			l.destroy()
 			replier.Reply(&net.RegisterResp{Msg: e.Error()}, nil)
@@ -227,10 +269,8 @@ func (this *IncMaster) onRegister(replier *drpc.Replier, req interface{}) {
 		mapInfo := msg.GetMaps()
 		mapInfo.MapId = mapId
 		mapInfo.SlaveId = msg.GetSlaveId()
-		this.mapping[mapId] = &mapping{
-			info:     mapInfo,
-			listener: l,
-		}
+		this.mapping[mapId] = mapInfo
+		this.listeners[mapId] = l
 		replier.Reply(&net.RegisterResp{}, nil)
 		fmt.Println("onRegister", msg, "ok")
 	})
@@ -246,18 +286,16 @@ func (this *IncMaster) onUnregister(replier *drpc.Replier, req interface{}) {
 		replier.Reply(&net.UnregisterResp{Msg: "mapping is not exist "}, nil)
 		return
 	}
-	slaveId := m.info.GetSlaveId()
+	slaveId := m.GetSlaveId()
 
-	end, ok := this.ends[slaveId]
+	s, ok := this.slaves[slaveId]
 	if !ok {
-		m.listener.destroy()
-		delete(this.mapping, slaveId)
 		replier.Reply(&net.UnregisterResp{}, nil)
 		return
 	}
 
 	destroy := &net.DestroyDialerReq{MapId: mapId}
-	this.rpcClient.Go(end, proto.MessageName(destroy), destroy, drpc.DefaultRPCTimeout, func(i interface{}, e error) {
+	this.rpcClient.Go(s, proto.MessageName(destroy), destroy, drpc.DefaultRPCTimeout, func(i interface{}, e error) {
 		if e != nil {
 			replier.Reply(&net.UnregisterResp{Msg: e.Error()}, nil)
 			return
@@ -269,8 +307,11 @@ func (this *IncMaster) onUnregister(replier *drpc.Replier, req interface{}) {
 			return
 		}
 
-		m.listener.destroy()
-		delete(this.mapping, slaveId)
+		delete(this.mapping, mapId)
+		if l := this.listeners[mapId]; l != nil {
+			l.destroy()
+			delete(this.listeners, mapId)
+		}
 		replier.Reply(&net.UnregisterResp{}, nil)
 		fmt.Println("onUnregister", msg, "ok")
 	})
@@ -307,7 +348,7 @@ func (this *IncMaster) onChannelMessage(replier *drpc.Replier, req interface{}) 
 		if err := ch.writeTo(msg.GetData()); err != nil {
 			ch.close()
 			delete(this.channels, ch.channelID)
-			replier.Reply(&net.ChannelMessageResp{Msg: "channel writeTo error" + err.Error()}, nil)
+			replier.Reply(&net.ChannelMessageResp{Msg: err.Error()}, nil)
 			return
 		}
 	} else {
@@ -316,6 +357,7 @@ func (this *IncMaster) onChannelMessage(replier *drpc.Replier, req interface{}) 
 	replier.Reply(&net.ChannelMessageResp{}, nil)
 }
 
+/*
 func (this *IncMaster) onClientCommand(replier *drpc.Replier, req interface{}) {
 	msg := req.(*net.ClientCmdReq)
 
@@ -333,3 +375,4 @@ func (this *IncMaster) onClientCommand(replier *drpc.Replier, req interface{}) {
 	}
 	replier.Reply(&net.ClientCmdResp{Data: b}, nil)
 }
+*/

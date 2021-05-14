@@ -4,7 +4,6 @@ option go_package = "net";
 // 内网服务器注册
 message login_req{
     string name = 1;
-    uint32 id   = 2; // 重连带上Id
 }
 
 message login_resp{

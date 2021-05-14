@@ -11,27 +11,36 @@ import (
 	"strings"
 )
 
-func main() {
-	fmt.Println(inc.Logo("inc-slave"))
+func Usage() {
+	usage := `Usage of inc-slave:
+  inc-slave [Options]
 
+General options:
+  -n, --name         name for slave (default: "slave"). 
+  -r, --register     register agents, use ';' split each other (e.g '127.0.0.1 22 2201 ssh; 127.0.0.1 5432 2345 postgreSQL').
+
+Connection options:
+  -h, --host         master server host.
+  -p, --port         master server port (default: "9852").`
+
+	fmt.Println(usage)
+}
+
+func main() {
 	commandLine := flag.NewFlagSet("inc-slave", flag.ExitOnError)
-	a := commandLine.String("a", "", "--address     address of external master, required. ")
-	n := commandLine.String("n", "", "--name        name for slave, optional. ")
-	r := commandLine.String("r", "", "--register    register one agent, e.g '127.0.0.1 22 2201 ssh'.")
-	rs := commandLine.String("rs", "", "--registers    register multiple agents, use ';' split each other.")
+	commandLine.Usage = Usage
+	h := commandLine.String("h", "", "--host     master server host, required ")
+	p := commandLine.Int("p", 9852, "--port     master server port, required ")
+	n := commandLine.String("n", "slave", "--name        name for slave, optional. ")
+	r := commandLine.String("r", "", "--register    register agents, use ';' split each other (e.g '127.0.0.1 22 2201 ssh; 127.0.0.1 5432 2345 postgreSQL').")
 	commandLine.Parse(os.Args[1:])
 
-	if *a == "" {
-		return
-	}
+	fmt.Println(inc.Logo("inc-slave"))
 
-	mappings := make([]*net.Mapping, 0, 4)
-	if m := parseMapping(*r); m != nil {
-		mappings = append(mappings, m)
-	}
-
-	if *rs != "" {
-		ss := strings.Split(*rs, ";")
+	var mappings []*net.Mapping
+	if *r != "" {
+		ss := strings.Split(*r, ";")
+		mappings = make([]*net.Mapping, 0, len(ss))
 		for _, s := range ss {
 			if m := parseMapping(s); m != nil {
 				mappings = append(mappings, m)
@@ -39,7 +48,8 @@ func main() {
 		}
 	}
 
-	_ = inc.LaunchIncSlave(*n, *a, mappings)
+	address := fmt.Sprintf("%s:%d", *h, *p)
+	_ = inc.LaunchIncSlave(*n, address, mappings)
 
 	select {}
 }

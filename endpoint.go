@@ -6,9 +6,7 @@ import (
 )
 
 type endpoint struct {
-	uId     uint32
-	name    string
-	isSlave bool
+	id      uint32
 	session dnet.Session
 }
 
@@ -18,4 +16,13 @@ func (this *endpoint) SendRequest(req *drpc.Request) error {
 
 func (this *endpoint) SendResponse(resp *drpc.Response) error {
 	return this.session.Send(resp)
+}
+
+type slave struct {
+	*endpoint
+	name string
+}
+
+type client struct {
+	*endpoint
 }

@@ -55,6 +55,19 @@ func (this *IncSlave) dial() {
 	}()
 }
 
+func (this *IncSlave) onClose(reason error) {
+	fmt.Printf("onConnected session closed, reason: %s\n", reason)
+	this.session = nil
+
+	for _, c := range this.channels {
+		c.close()
+	}
+
+	this.channels = map[uint32]*channel{}
+	this.dialers = map[uint32]*dialer{}
+	this.dial()
+}
+
 func (this *IncSlave) onConnected(conn dnet.NetConn) {
 	this.taskQueue.Push(func() {
 		this.dialing = false
@@ -63,9 +76,7 @@ func (this *IncSlave) onConnected(conn dnet.NetConn) {
 			dnet.WithCodec(net.NewCodec()),
 			dnet.WithCloseCallback(func(session dnet.Session, reason error) {
 				this.taskQueue.Push(func() {
-					this.session = nil
-					fmt.Printf("onConnected session closed, reason: %s\n", reason)
-					this.dial()
+					this.onClose(reason)
 				})
 			}),
 			dnet.WithErrorCallback(func(session dnet.Session, err error) {
