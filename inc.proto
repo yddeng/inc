@@ -1,0 +1,43 @@
+syntax = "proto3";
+option go_package = "inc";
+
+// 代理映射
+message mapping {
+    string internal_ip    = 1; // 内网ip
+    int32  internal_port  = 2; // 内网代理端口
+    int32  external_port  = 3; // 外网端口
+    string description    = 4;
+    uint32 map_id         = 5; // usage for list
+    uint32 slave_id       = 6; // usage for list
+}
+
+// 注册代理映射
+message register_req{
+    string internal_ip    = 1; // 内网ip
+    int32  internal_port  = 2; // 内网代理端口
+    int32  external_port  = 3; // 外网端口
+    string description    = 4;
+}
+
+
+// 注销代理映射
+message unregister_req{
+    uint32 external_port = 1;
+}
+
+message dial_req{
+    string address = 1;
+}
+
+message login_req{
+    string name = 1;
+}
+
+message auth_req{
+    string token = 1;
+}
+
+message rpc_resp{
+    string msg = 1;
+}
+

@@ -1,56 +1,92 @@
 package inc
 
 import (
-	"fmt"
-	"github.com/golang/protobuf/proto"
-	"github.com/yddeng/dnet"
 	"github.com/yddeng/dnet/drpc"
-	net2 "github.com/yddeng/inc/net"
+	"github.com/yddeng/smux"
 	"net"
+	"sync"
 )
 
+// inc-ps
+// inc-pc
+
 type channel struct {
-	channelID uint32
-	mapID     uint32
-	conn      net.Conn
-	rpcClient *drpc.Client
-	session   dnet.Session
+	inConn   *smux.Stream
+	realConn net.Conn
+
+	closeFn   func()
+	closeOnce sync.Once
 }
 
 func (this *channel) close() {
-	if this.conn != nil {
-		fmt.Println("channel", this.channelID, "close")
-		this.conn.Close()
-		this.conn = nil
-	}
+	this.closeOnce.Do(func() {
+		this.closeFn()
+		this.inConn.Close()
+		this.realConn.Close()
+	})
 }
 
-func (this *channel) handleRead(onClose func()) {
-	if this.conn != nil {
-		buf := make([]byte, 1024)
-		for {
-			n, err := this.conn.Read(buf)
-			if err != nil {
-				//fmt.Println("client.Read", err)
-				msg := &net2.CloseChannelReq{ChannelId: this.channelID}
-				_, _ = this.rpcClient.Call(&endpoint{session: this.session}, proto.MessageName(msg), msg, drpc.DefaultRPCTimeout)
-				break
-			}
+func (this *channel) start(closeFunc func()) {
+	this.closeFn = closeFunc
+	go this.handleRead()
+	go this.handleWrite()
+}
 
-			//fmt.Println("client.Read", buf[:n])
-			msg := &net2.ChannelMessageReq{ChannelId: this.channelID, Data: buf[:n]}
-			if _, err := this.rpcClient.Call(&endpoint{session: this.session}, proto.MessageName(msg), msg, drpc.DefaultRPCTimeout); err != nil {
-				break
-			}
+func (this *channel) handleRead() {
+	buf := make([]byte, 1024)
+	for {
+		n, err := this.realConn.Read(buf)
+		if err != nil {
+			break
 		}
-
-		onClose()
+		//fmt.Println("client.Read", buf[:n])
+		if _, err = WriteMessage(this.inConn, &Message{Data: &StreamData{Data: buf[:n]}}); err != nil {
+			break
+		}
 	}
+	this.close()
 }
 
-func (this *channel) writeTo(b []byte) (err error) {
-	if this.conn != nil {
-		_, err = this.conn.Write(b)
+func (this *channel) handleWrite() {
+	for {
+		msg, err := ReadMessage(this.inConn)
+		if err != nil {
+			break
+		}
+		if _, err := this.realConn.Write(msg.Data.(*StreamData).GetData()); err != nil {
+			break
+		}
 	}
-	return
+	this.close()
+}
+
+func dial(address string, stream *smux.Stream) error {
+	conn, err := net.Dial("tcp", address)
+	if err != nil {
+		return err
+	}
+
+	channel := &channel{
+		inConn:   stream,
+		realConn: conn,
+	}
+
+	channel.start(func() {
+
+	})
+	return nil
+}
+
+type streamChannel struct {
+	stream *smux.Stream
+}
+
+func (this *streamChannel) SendRequest(req *drpc.Request) error {
+	_, err := WriteMessage(this.stream, &Message{Seq: req.Seq, Data: req.Data})
+	return err
+}
+
+func (this *streamChannel) SendResponse(resp *drpc.Response) error {
+	_, err := WriteMessage(this.stream, &Message{Seq: resp.Seq, Data: resp.Data})
+	return err
 }

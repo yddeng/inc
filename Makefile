@@ -1,2 +1,2 @@
 proto:
-	cd net; protoc --go_out=. *.proto;cd ../
+	protoc --go_out=. *.proto;cd ../
